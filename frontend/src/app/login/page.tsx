@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { EyeIcon, EyeSlashIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -19,6 +20,8 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { useLogin } from "@/hooks/use-login";
+import { toast } from "@/components/ui/toast";
 
 const loginSchema = z.object({
   email: z
@@ -37,10 +40,13 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const { mutateAsync: signIn, isPending, error: signInError } = useLogin();
+  const router = useRouter();
 
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -51,9 +57,18 @@ const LoginPage = () => {
   });
 
   const onSubmit = async (data: LoginFormValues) => {
-    // TODO: replace with actual login logic (e.g., better-auth signIn)
-    console.log("Login data:", data);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    try {
+      await signIn({
+        email: data.email,
+        password: data.password,
+      });
+      toast.add({ type: "success", description: "Login Successful!" });
+      reset();
+      router.push("/");
+    } catch (error) {
+      toast.add({ type: "warning", description: (error as Error).message });
+      console.log(error);
+    }
   };
 
   const handleGithubLogin = () => {
@@ -196,7 +211,7 @@ const LoginPage = () => {
 
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isPending}
               className="w-full h-10 rounded-md bg-[#4E64EE] hover:bg-[#4E64EE]/90 text-white font-medium text-sm disabled:opacity-70"
             >
               {isSubmitting ? "Logging in..." : "Log In"}

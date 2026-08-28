@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/toast";
 
 type SignUpFormValues = z.infer<typeof signUpSchema>;
 
@@ -43,6 +44,7 @@ const SignUpPage = () => {
     register,
     handleSubmit,
     control,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
@@ -56,13 +58,19 @@ const SignUpPage = () => {
   });
 
   const onSubmit = async (data: SignUpFormValues) => {
-    await signUp({
-      username: data.username,
-      email: data.email,
-      password: data.password,
-      dob: data.dob,
-    });
-
+    try {
+      await signUp({
+        username: data.username,
+        email: data.email,
+        password: data.password,
+        dob: data.dob,
+      });
+      toast.add({ type: "success", description: "Registration Successful" });
+      reset();
+      router.push("/login");
+    } catch (error) {
+      toast.add({ type: "warning", description: (error as Error).message });
+    }
     if (signUpError) {
       const msg = (signUpError as Error).message;
       console.log(msg);
@@ -408,7 +416,7 @@ const SignUpPage = () => {
 
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isPending}
               className="w-full h-10 rounded-md bg-[#4E64EE] hover:bg-[#4E64EE]/90 text-white font-medium text-sm disabled:opacity-70"
             >
               {isSubmitting ? "Creating account..." : "Sign Up"}

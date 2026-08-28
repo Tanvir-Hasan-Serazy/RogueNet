@@ -2,22 +2,17 @@ import { useMutation } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 
 type Payload = {
-  username: string;
   email: string;
   password: string;
-  dob: string;
 };
 
-export const useSignup = () =>
+export const useLogin = () =>
   useMutation({
-    mutationKey: ["signUp"],
+    mutationKey: ["login"],
     mutationFn: async (payload: Payload) => {
-      const { data, error } = await authClient.signUp.email({
+      const { data, error } = await authClient.signIn.email({
         email: payload.email,
         password: payload.password,
-        name: payload.username,
-        username: payload.username,
-        dob: new Date(payload.dob),
       });
       if (error) {
         throw new Error(error.message || error.statusText);

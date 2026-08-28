@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./provider";
+import { Toaster } from "@/components/ui/toast";
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
+        <Toaster />
       </body>
     </html>
   );

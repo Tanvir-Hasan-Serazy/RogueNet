@@ -1,0 +1,66 @@
+{
+  // https://aka.ms/tsconfig
+  "compilerOptions": {
+    // === Environment ===
+    // ESM package ("type": "module" in package.json) + Node 20+ / 24
+    "target": "ESNext",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
+    "types": ["node"],
+
+    // === File Layout ===
+    // rootDir "." to include src/, ws-server/, tests/, prisma/
+    // outDir keeps dist mirroring source structure (dist/src, dist/ws-server)
+    // Note: TS 7 + NodeNext forbids baseUrl; paths must be relative (./)
+    "rootDir": ".",
+    "outDir": "./dist",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@core/*": ["./src/core/*"],
+      "@features/*": ["./src/features/*"],
+      "@workers/*": ["./src/workers/*"],
+      "@ws-server/*": ["./ws-server/*"]
+    },
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": false,
+
+    // === Interop ===
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // === Output ===
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "stripInternal": true,
+
+    // === Strictness (keep your current strict set) ===
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+
+    // === Style / Safety (recommended for NodeNext ESM) ===
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "noUncheckedSideEffectImports": true,
+    "noErrorTruncation": true
+  },
+  "include": [
+    "src/**/*",
+    "ws-server/**/*",
+    "workers/**/*",
+    "prisma/**/*",
+    "tests/**/*",
+    "index.ts",
+    "prisma.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "coverage"]
+}

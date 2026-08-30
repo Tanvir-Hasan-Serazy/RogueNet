@@ -65,7 +65,11 @@ const SignUpPage = () => {
         password: data.password,
         dob: data.dob,
       });
-      toast.add({ type: "success", description: "Registration Successful" });
+      toast.add({
+        type: "success",
+        description:
+          "Registration successful! Check your email to verify your account.",
+      });
       reset();
       router.push("/login");
     } catch (error) {
@@ -78,11 +82,17 @@ const SignUpPage = () => {
   };
 
   const handleGithubSignUp = () => {
-    console.log("Sign up with GitHub");
+    toast.add({
+      type: "warning",
+      description: "GitHub sign-up not configured",
+    });
   };
 
   const handleGoogleSignUp = () => {
-    console.log("Sign up with Google");
+    toast.add({
+      type: "warning",
+      description: "Google sign-up not configured",
+    });
   };
 
   const maxDobDate = (() => {

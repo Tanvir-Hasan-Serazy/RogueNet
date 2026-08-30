@@ -1,27 +1,61 @@
 import { useMutation } from "@tanstack/react-query";
-import { authClient } from "@/lib/auth-client";
+import { isAxiosError } from "axios";
 
-type Payload = {
+import api from "@/lib/axios";
+
+type SignUpPayload = {
   username: string;
   email: string;
   password: string;
+  confirmPassword?: string;
   dob: string;
 };
 
+type User = {
+  id: string;
+  email: string;
+  username: string;
+  name?: string | null;
+  dob: string;
+  emailVerified: boolean;
+};
+
+type RegisterResponse = {
+  user: User;
+  message?: string;
+  accessToken?: string;
+};
+
+const getErrorMessage = (err: unknown, fallback: string) => {
+  if (isAxiosError(err)) {
+    const data = err.response?.data as
+      | { message?: string; error?: string; errors?: unknown }
+      | undefined;
+    return data?.message || data?.error || err.message || fallback;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+};
+
 export const useSignup = () =>
-  useMutation({
+  useMutation<RegisterResponse, Error, SignUpPayload>({
     mutationKey: ["signUp"],
-    mutationFn: async (payload: Payload) => {
-      const { data, error } = await authClient.signUp.email({
-        email: payload.email,
-        password: payload.password,
-        name: payload.username,
-        username: payload.username,
-        dob: new Date(payload.dob),
-      });
-      if (error) {
-        throw new Error(error.message || error.statusText);
+    mutationFn: async (payload) => {
+      try {
+        // Backend expects: username, email, password, dob
+        const body = {
+          username: payload.username,
+          email: payload.email,
+          password: payload.password,
+          dob: payload.dob,
+        };
+        const { data } = await api.post<RegisterResponse>(
+          "/api/auth/register",
+          body,
+        );
+        return data;
+      } catch (err) {
+        throw new Error(getErrorMessage(err, "Registration failed"));
       }
-      return data;
     },
   });

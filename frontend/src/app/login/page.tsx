@@ -22,19 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useLogin } from "@/hooks/use-login";
 import { toast } from "@/components/ui/toast";
-
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "Email is required")
-    .trim()
-    .toLowerCase()
-    .pipe(z.email("Please enter a valid email address")),
-  password: z
-    .string()
-    .min(1, "Password is required")
-    .min(8, "Password must be at least 8 characters"),
-});
+import { loginSchema } from "@/schema/loginSchema";
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
@@ -72,13 +60,11 @@ const LoginPage = () => {
   };
 
   const handleGithubLogin = () => {
-    // TODO: integrate with better-auth or next-auth
-    console.log("Login with GitHub");
+    toast.add({ type: "warning", description: "GitHub login not configured" });
   };
 
   const handleGoogleLogin = () => {
-    // TODO: integrate with better-auth or next-auth
-    console.log("Login with Google");
+    toast.add({ type: "warning", description: "Google login not configured" });
   };
 
   return (
@@ -163,7 +149,7 @@ const LoginPage = () => {
                     Password
                   </FieldLabel>
                   <Link
-                    href="#"
+                    href="/forgot-password"
                     tabIndex={-1}
                     className="text-xs font-medium text-[#4E64EE] hover:underline underline-offset-4"
                   >

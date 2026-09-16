@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSignup } from "@/hooks/use-sign-up";
+import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { CalendarDotsIcon, EyeIcon, EyeSlashIcon } from "@phosphor-icons/react";
 import { format } from "date-fns";
@@ -81,17 +82,17 @@ const SignUpPage = () => {
     }
   };
 
-  const handleGithubSignUp = () => {
-    toast.add({
-      type: "warning",
-      description: "GitHub sign-up not configured",
+  const handleGithubSignUp = async () => {
+    await authClient.signIn.social({
+      provider: "github",
+      callbackURL: `${window.location.origin}/`,
     });
   };
 
-  const handleGoogleSignUp = () => {
-    toast.add({
-      type: "warning",
-      description: "Google sign-up not configured",
+  const handleGoogleSignUp = async () => {
+    await authClient.signIn.social({
+      provider: "google",
+      callbackURL: `${window.location.origin}/`,
     });
   };
 

@@ -5,6 +5,7 @@ Greenfield social platform (roguenet) with no existing code. See proposal.md Why
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Integrate better-auth as the sole auth source of truth with Prisma or Drizzle adapter, cookie-based sessions, email/password + verification, and optional OAuth, reused for both HTTP and WebSocket auth.
 - Deliver phased social product (identity -> content -> engagement -> distribution -> real-time) without schema-breaking migrations, with better-auth user as FK root for all social tables.
 - Data model that supports visibility (public/followers_only/private) and soft-delete inheritance for reposts on day one.
@@ -13,6 +14,7 @@ Greenfield social platform (roguenet) with no existing code. See proposal.md Why
 - Single multiplexed authenticated WebSocket tied to better-auth session for presence, messaging, typing, live comments/notifications.
 
 **Non-Goals:**
+
 - Custom auth, manual password hashing, or parallel session tables outside better-auth.
 - Recommendation ML / algorithmic For You feed beyond simple downvote demotion + recency.
 - E2E encryption for messaging.
@@ -21,21 +23,25 @@ Greenfield social platform (roguenet) with no existing code. See proposal.md Why
 
 ## Decisions
 
-### 1. Auth: better-auth with Prisma/Drizzle Adapter (Decision from User)
-**Chosen:** `better-auth` as auth framework. Use Prisma adapter if Prisma is ORM, or Drizzle adapter if Drizzle is ORM — both are first-class. Configure with emailAndPassword (with email verification), session (cookie, httpOnly, sameSite lax, secure in prod), and optional OAuth providers (GitHub/Google). better-auth creates its own tables (`user`, `session`, `account`, `verification`) via migration; app extends `user` with social fields (username, displayName, bio, avatarUrl) via additionalFields or a linked `profile` table FK to `user.id`. All protected routes use `auth.api.getSession` (server) or `authClient.useSession` (client); WebSocket handshake validates better-auth session cookie/token.
+### 1. Auth: Better Auth with Prisma 7 Adapter (Decision from User)
+
+**Chosen:** `better-auth` with the Prisma adapter on Prisma 7. Configure email/password, cookie sessions, and Google/GitHub OAuth in the Express backend. Better Auth owns the `user`, `session`, `account`, and `verification` tables; the app extends `user` with optional `username` and `dob` fields through `additionalFields`. The Express handler is mounted at `/api/auth/*`; the Next.js client calls the same API with credentials enabled. Protected routes use `auth.api.getSession`, and WebSocket handshakes validate the Better Auth session cookie.
 **Alternatives considered:** NextAuth/Auth.js — more Next.js-specific, less flexible adapter model; custom JWT — hides nothing but reimplements what better-auth already solves and was explicitly not requested; Supabase Auth — managed, hides hard problems, couples to Supabase.
 **Rationale:** User explicitly chose better-auth; it provides the best learning surface for modern auth (adapters, plugins, session vs JWT, OAuth, verification) while removing undifferentiated auth boilerplate.
 
-### 2. Stack: Next.js App Router + Prisma + Postgres + Redis + Cloudinary + WebSockets
-**Chosen:** Next.js App Router recommended (better-auth has first-class Next.js integration via `auth` handler at `app/api/auth/[...all]/route.ts`), Prisma as ORM (works cleanly with better-auth Prisma adapter), Postgres as source of truth, Redis for presence TTL + pub/sub, Cloudinary for media via signed direct upload, queue via BullMQ or pg-boss for notification batching. Express alternative viable via better-auth Node adapter but Next.js minimizes glue.
-**Alternatives:** Express + separate Vite frontend — viable, more plumbing for better-auth Node handler; Supabase/Firebase — rejected for learning goal.
-**Rationale:** Minimizes integration friction with better-auth while maximizing learning of relational modeling and distributed presence.
+### 2. Stack: Express + Next.js + Prisma 7 + Postgres + Redis + Cloudinary + WebSockets
+
+**Chosen:** Express serves the Better Auth Node handler and the future REST API; Next.js provides the frontend. Prisma 7 with `@prisma/adapter-pg` is the ORM and Postgres is the source of truth. Redis handles presence/pub-sub, Cloudinary handles signed direct uploads, and BullMQ or pg-boss handles notification batching.
+**Alternative:** Move the Better Auth handler into Next.js later if the API is consolidated; the Better Auth contract and database tables remain unchanged.
+**Rationale:** This matches the current repository layout while retaining Better Auth's standard session and adapter behavior.
 
 ### 3. Data Model: better-auth User as Root + Social Tables
+
 **Chosen:**
+
 ```
-// managed by better-auth (via adapter)
-user(id, email, emailVerified, name, image, createdAt, updatedAt, username unique, displayUsername, bio, avatarUrl ...)
+// managed by better-auth (via Prisma 7 adapter)
+user(id, email, emailVerified, name, image, createdAt, updatedAt, username unique nullable, dob nullable)
 session(id, userId FK, token, expiresAt, ipAddress, userAgent, ...)
 account(id, userId FK, providerId, accountId, ...)
 verification(id, identifier, value, expiresAt, ...)
@@ -53,45 +59,56 @@ messages(id, conversationId FK, senderId FK user.id, body nullable, imageUrl nul
 messageReads(messageId, userId, readAt) PK(messageId,userId)
 notifications(id, receiverId FK user.id, type enum('follow','like','repost','reply','message'), actorId FK user.id, targetId, aggregatedCount int default 1, isRead bool, createdAt)
 ```
+
 All app tables FK to `user.id` from better-auth. Username uniqueness enforced via DB unique index on `user.username` (additionalField) or profile table unique. Soft delete via `deletedAt`; reposts hide when `original.deletedAt IS NOT NULL OR original.visibility='private' OR (original.visibility='followers_only' AND viewer not follower)`.
 **Alternative:** Separate profile table vs extending better-auth user — both valid; extending via `additionalFields` keeps single user table, separate profile table keeps auth migration clean. Choose extended user with additionalFields for simplicity; can split later.
 
 ### 4. Auth Integration Pattern: Middleware + Server Helpers + WS Handshake
-**Chosen:** 
-- HTTP: Next.js middleware or per-route guard calling `auth.api.getSession({ headers })` — returns `session.user` or 401. Client uses `authClient` (better-auth client) for signUp/signIn/signOut/useSession.
+
+**Chosen:**
+
+- HTTP: Express routes call `auth.api.getSession({ headers })` and return 401 when no session exists. The Next.js client uses `authClient` for email sign-up/sign-in and Google/GitHub social sign-in.
 - WebSocket: handshake reads better-auth session cookie (`better-auth.session_token` or configured cookie name) from `req.headers.cookie`, validates via `auth.api.getSession`, attaches `userId` to socket; unauthenticated sockets rejected. Single socket per user multiplexed for feed push, messaging, presence, typing, notifications.
 - Authorization: after authentication, call central `canView(viewerId, post)` for visibility checks — decoupled from better-auth (auth proves who you are, `canView` proves what you can see).
-**Alternative:** JWT bearer for WS — viable but better-auth default is cookie session; staying cookie-aligned avoids dual auth modes.
+  **Alternative:** JWT bearer for WS — viable but better-auth default is cookie session; staying cookie-aligned avoids dual auth modes.
 
 ### 5. Visibility Enforcement: DB + Service Guard
+
 **Chosen:** Central `canView(viewerId, post)` called on every read path (feed, search, profile, repost hydration). Enforced in SQL WHERE, not just app filtering. Index on `(authorId, visibility, createdAt)` and GIN on `tsvector`.
 **Alternative:** RLS — deferred.
 
 ### 6. Feed Fan-out: Hybrid Push to Active + Pull for Offline
+
 **Chosen:** Presence `SET presence:{userId} 1 EX 300` on WS connect + 30s heartbeat. On post create: fetch follower IDs, intersect with online set (Redis), push `new_post` via WS to online followers; offline served via pull `WHERE authorId IN (following+self) AND canView` on next feed request. Demonstrates both paths.
 **Alternative:** Pure push (timeline tables) — storage heavy; pure pull — never teaches push.
 
 ### 7. Pagination: Cursor for Feed, Offset for Search
+
 **Chosen:** Feed `WHERE id < :cursor ORDER BY id DESC LIMIT 20` (or `(createdAt,id)` composite). Search `LIMIT 20 OFFSET :page*20` with max page cap 100. Directly teaches offset drift (demo bug with two browsers, then fix).
 **Alternative:** All offset — duplicates/skips on live feed; all cursor — no page jumps for search.
 
 ### 8. Ranking: Downvote Demotion
+
 **Chosen:** `score = (up - down) - hours_since*0.5` with `effectiveScore = score - down*1.5` penalty, ordered in feed. Precompute `hotScore` column updated on vote or async job for MVP.
 **Alternative:** Wilson/Reddit hot — deferred iteration.
 
 ### 9. Search: Postgres FTS First, Pluggable
+
 **Chosen:** Postgres `tsvector + GIN` for posts, `pg_trgm` for people prefix search. Toggle `Posts | People` maps to two queries behind `SearchService` interface.
 **Alternative:** Elasticsearch from day one — heavier ops.
 
 ### 10. Media: Signed Direct Upload to Cloudinary
+
 **Chosen:** Client requests signed params from `POST /api/media/sign` (protected by better-auth session), uploads directly to Cloudinary, sends `secure_url` in post/message create. API never proxies bytes.
 **Alternative:** Proxy through server — doubles bandwidth.
 
 ### 11. Notifications: Buffered Aggregation
+
 **Chosen:** Buffer key `notif:{type}:{targetId}:{receiverId}` with 5-min window in Redis/DB; worker (BullMQ/pg-boss) aggregates count, inserts single notification, live WS push `notification:new`. Unread count via `COUNT WHERE isRead=false`.
 **Alternative:** Immediate per-event insert — spam.
 
 ### 12. Messaging: Unified Conversations Model
+
 **Chosen:** Single `conversations` with `isGroup`, rooms `conversation:{id}` for WS fan-out, read receipts per user per message, typing ephemeral `typing:start/stop` with 3s timeout.
 **Alternative:** Separate 1:1/group tables — duplication.
 
@@ -112,7 +129,8 @@ All app tables FK to `user.id` from better-auth. Username uniqueness enforced vi
 ## Migration Plan
 
 Greenfield — no migration. Deploy order:
-1. Scaffold Next.js + Prisma + better-auth (adapter, `app/api/auth/[...all]/route.ts`, client, env), run adapter generate + `prisma migrate`, verify sign-up/sign-in/session/middleware + protected route -> deploy.
+
+1. Configure the Express Better Auth Node handler, Prisma 7 adapter, Next.js client, and environment variables; run `prisma generate` and `prisma migrate`, then verify sign-up/sign-in/session and a protected route -> deploy.
 2. Add profile/social-graph/posts/replies/voting/bookmarks (HTTP only, `canView` guard using `session.user.id`) -> deploy, verify visibility.
 3. Add Cloudinary signed uploads (protected by better-auth session), FTS search, feed cursor/offset, notification batching worker -> deploy, verify pagination.
 4. Add WS server + presence + live notifications/typing/comments (WS auth via better-auth session) -> single instance -> deploy.

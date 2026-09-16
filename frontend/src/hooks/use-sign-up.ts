@@ -1,7 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
-import { isAxiosError } from "axios";
 
-import api from "@/lib/axios";
+import { authClient } from "@/lib/auth-client";
 
 type SignUpPayload = {
   username: string;
@@ -11,51 +10,25 @@ type SignUpPayload = {
   dob: string;
 };
 
-type User = {
-  id: string;
-  email: string;
-  username: string;
-  name?: string | null;
-  dob: string;
-  emailVerified: boolean;
-};
-
-type RegisterResponse = {
-  user: User;
-  message?: string;
-  accessToken?: string;
-};
-
-const getErrorMessage = (err: unknown, fallback: string) => {
-  if (isAxiosError(err)) {
-    const data = err.response?.data as
-      | { message?: string; error?: string; errors?: unknown }
-      | undefined;
-    return data?.message || data?.error || err.message || fallback;
-  }
-  if (err instanceof Error) return err.message;
-  return fallback;
-};
-
 export const useSignup = () =>
-  useMutation<RegisterResponse, Error, SignUpPayload>({
+  useMutation<
+    Awaited<ReturnType<typeof authClient.signUp.email>>,
+    Error,
+    SignUpPayload
+  >({
     mutationKey: ["signUp"],
     mutationFn: async (payload) => {
-      try {
-        // Backend expects: username, email, password, dob
-        const body = {
-          username: payload.username,
-          email: payload.email,
-          password: payload.password,
-          dob: payload.dob,
-        };
-        const { data } = await api.post<RegisterResponse>(
-          "/api/auth/register",
-          body,
-        );
-        return data;
-      } catch (err) {
-        throw new Error(getErrorMessage(err, "Registration failed"));
+      const { data, error } = await authClient.signUp.email({
+        email: payload.email,
+        password: payload.password,
+        name: payload.username,
+        username: payload.username,
+        dob: payload.dob,
+      } as Parameters<typeof authClient.signUp.email>[0] &
+        Pick<SignUpPayload, "username" | "dob">);
+      if (error) {
+        throw new Error(error.message || "Registration failed");
       }
+      return data;
     },
   });

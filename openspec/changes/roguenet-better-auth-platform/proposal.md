@@ -6,7 +6,7 @@ Greenfield social network (roguenet) for learning — no existing codebase. The 
 
 New platform with phased delivery. No breaking changes (greenfield).
 
-- **Auth (better-auth):** Email/password + email verification, session management (cookie-based), social OAuth optional, protected routes via better-auth middleware, user table owned by better-auth adapter (Prisma/Drizzle). Username/profile extension on top of better-auth `user` model.
+- **Auth (better-auth):** Email/password + email verification, cookie-based session management, Google and GitHub OAuth, protected routes via Better Auth session APIs, and a user table owned by the Prisma adapter. Username/profile extension on top of Better Auth's `user` model.
 - **Phase 0 — Identity:** Profiles (display name, bio, avatar) linked to better-auth user, follow/unfollow with follower graph
 - **Phase 1 — Content:** Posts with three visibility levels (public / followers-only / private), media uploads via Cloudinary (image + video, signed direct upload), flat-threaded replies (single parent level + optional reply_to_user hint), simple reposts (hide everywhere if original deleted or becomes private/restricted)
 - **Phase 2 — Engagement:** Upvote/downvote (downvote demotes in feed ranking, not deletion), bookmarks, vote state per user
@@ -18,6 +18,7 @@ Cross-cutting: soft deletes for posts, visibility enforcement on every read path
 ## Capabilities
 
 ### New Capabilities
+
 - `auth`: Authentication and session management via better-auth (sign-up, sign-in, sign-out, session, email verification, password reset, OAuth, route protection)
 - `profile`: User profile extension atop better-auth user (username unique, display name, bio, avatar URL, public profile views)
 - `social-graph`: Follow/unfollow, follower/following lists and counts, follow-state checks for visibility
@@ -31,11 +32,12 @@ Cross-cutting: soft deletes for posts, visibility enforcement on every read path
 - `presence`: Online status via presence service (WebSocket + Redis TTL/heartbeat), typing indicators (ephemeral), real-time comments and live notification delivery
 
 ### Modified Capabilities
+
 - (none — greenfield)
 
 ## Impact
 
-- **Code:** New repo — API (Next.js App Router recommended for better-auth first-class support, or Express with better-auth Node adapter), WebSocket/presence service, worker for notification batching, DB schema (Postgres + Prisma/Drizzle with better-auth adapter tables), Redis for presence/pub-sub, Cloudinary.
-- **APIs:** better-auth handles `/api/auth/*` routes; app adds REST/WS for all social capabilities plus `POST /api/media/sign` for Cloudinary; WebSocket auth via better-auth session cookie/token.
-- **Dependencies:** better-auth, Postgres, Redis, Cloudinary, WebSocket library (Socket.io/ws + Redis adapter), queue/worker (BullMQ/pg-boss) for batching, Prisma or Drizzle (required adapter for better-auth).
+- **Code:** Express API with Better Auth's Node handler, Next.js frontend, WebSocket/presence service, worker for notification batching, Postgres schema managed by Prisma 7, Redis for presence/pub-sub, and Cloudinary.
+- **APIs:** Better Auth handles `/api/auth/*` through the Express adapter; the app adds REST/WS for all social capabilities plus `POST /api/media/sign` for Cloudinary. WebSocket auth uses the Better Auth session cookie.
+- **Dependencies:** `better-auth`, `@prisma/client` 7, `@prisma/adapter-pg`, Postgres, Redis, Cloudinary, WebSocket library (Socket.io/ws + Redis adapter), and a queue/worker (BullMQ/pg-boss) for batching.
 - **Systems:** better-auth session table/adapter migration is source of truth for identity; all other tables FK to `user.id`; horizontal WS scaling requires Redis adapter; visibility checks must use `session.user.id` from better-auth on every read path.

@@ -57,9 +57,9 @@
     "src/**/*",
     "ws-server/**/*",
     "workers/**/*",
-    "prisma/**/*",
+    "src/prisma/**/*",
     "tests/**/*",
-    "index.ts",
+    "/src/index.ts",
     "prisma.config.ts"
   ],
   "exclude": ["node_modules", "dist", "coverage"]

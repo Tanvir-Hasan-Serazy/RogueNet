@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useLogin } from "@/hooks/use-login";
+import { authClient } from "@/lib/auth-client";
 import { toast } from "@/components/ui/toast";
 import { loginSchema } from "@/schema/loginSchema";
 
@@ -28,7 +29,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
-  const { mutateAsync: signIn, isPending, error: signInError } = useLogin();
+  const { mutateAsync: signIn, isPending } = useLogin();
   const router = useRouter();
 
   const {
@@ -59,12 +60,18 @@ const LoginPage = () => {
     }
   };
 
-  const handleGithubLogin = () => {
-    toast.add({ type: "warning", description: "GitHub login not configured" });
+  const handleGithubLogin = async () => {
+    await authClient.signIn.social({
+      provider: "github",
+      callbackURL: `${window.location.origin}/`,
+    });
   };
 
-  const handleGoogleLogin = () => {
-    toast.add({ type: "warning", description: "Google login not configured" });
+  const handleGoogleLogin = async () => {
+    await authClient.signIn.social({
+      provider: "google",
+      callbackURL: `${window.location.origin}/`,
+    });
   };
 
   return (

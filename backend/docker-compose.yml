@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: roguenet
+      POSTGRES_PASSWORD: roguenet
+      POSTGRES_DB: roguenet
+    ports:
+      - "5432:5432"
+    volumes:
+      - roguenet-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  roguenet-postgres-data:

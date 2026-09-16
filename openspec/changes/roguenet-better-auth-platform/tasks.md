@@ -1,9 +1,10 @@
 ## 1. Project Bootstrap & better-auth Setup
 
-- [ ] 1.1 Initialize Next.js App Router with TypeScript, ESLint, Prisma (or Drizzle), Postgres, Redis, and verify `npm run dev` starts and connects to DB
-- [ ] 1.2 Install and configure better-auth with Prisma/Drizzle adapter, define `auth` instance with emailAndPassword (verification), social OAuth placeholders, and verify `auth` handler at `app/api/auth/[...all]/route.ts` responds
-- [ ] 1.3 Run better-auth adapter generate + `prisma migrate dev` (or drizzle generate+migrate) for `user/session/account/verification` tables, extend `user` with `username` unique + `displayUsername/bio/avatarUrl` via additionalFields, and verify sign-up via better-auth creates user and session cookie
-- [ ] 1.4 Configure better-auth client (`authClient`) with `useSession`, implement middleware/route guard using `auth.api.getSession`, and verify protected endpoint returns 401 without cookie and 200 with valid session
+- [x] 1.1 Initialize the existing Next.js/Express workspace with TypeScript, ESLint, Prisma 7, and Postgres configuration
+- [x] 1.2 Install and configure Better Auth with the Prisma adapter, Express Node handler at `/api/auth/*`, cookie sessions, and Google/GitHub environment configuration
+- [ ] 1.3 Apply the Prisma migration for `user/session/account/verification` and the optional `username`/`dob` user fields; the remote database migration is still pending
+- [x] 1.4 Configure the frontend `authClient` for email sign-in/sign-up and Google/GitHub sign-in
+- [ ] 1.5 Add session queries and protected-route helpers using `auth.api.getSession`; verify 401 without a cookie and 200 with a valid session
 
 ## 2. Identity — Profile & Social Graph
 

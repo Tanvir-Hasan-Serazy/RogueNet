@@ -41,7 +41,7 @@ Greenfield social platform (roguenet) with no existing code. See proposal.md Why
 
 ```
 // managed by better-auth (via Prisma 7 adapter)
-user(id, email, emailVerified, name, image, createdAt, updatedAt, username unique nullable, dob nullable)
+user(id, email, emailVerified, name, firstName, lastName, image, createdAt, updatedAt, username unique nullable, dob nullable)
 session(id, userId FK, token, expiresAt, ipAddress, userAgent, ...)
 account(id, userId FK, providerId, accountId, ...)
 verification(id, identifier, value, expiresAt, ...)
@@ -63,14 +63,14 @@ notifications(id, receiverId FK user.id, type enum('follow','like','repost','rep
 All app tables FK to `user.id` from better-auth. Username uniqueness enforced via DB unique index on `user.username` (additionalField) or profile table unique. Soft delete via `deletedAt`; reposts hide when `original.deletedAt IS NOT NULL OR original.visibility='private' OR (original.visibility='followers_only' AND viewer not follower)`.
 **Alternative:** Separate profile table vs extending better-auth user — both valid; extending via `additionalFields` keeps single user table, separate profile table keeps auth migration clean. Choose extended user with additionalFields for simplicity; can split later.
 
-### 4. Auth Integration Pattern: Middleware + Server Helpers + WS Handshake
+### 4. Auth Integration Pattern: Better-Auth Delegation + WS Handshake (no custom middleware)
 
 **Chosen:**
 
-- HTTP: Express routes call `auth.api.getSession({ headers })` and return 401 when no session exists. The Next.js client uses `authClient` for email sign-up/sign-in and Google/GitHub social sign-in.
+- HTTP: App routes delegate to better-auth as sole authority via `auth.api.getSession({ headers })` — a thin helper (1-2 lines) that returns 401 when no session exists, not a custom auth system. No password/session logic outside better-auth. The Next.js client uses `authClient` for email sign-up/sign-in and Google/GitHub social sign-in.
 - WebSocket: handshake reads better-auth session cookie (`better-auth.session_token` or configured cookie name) from `req.headers.cookie`, validates via `auth.api.getSession`, attaches `userId` to socket; unauthenticated sockets rejected. Single socket per user multiplexed for feed push, messaging, presence, typing, notifications.
 - Authorization: after authentication, call central `canView(viewerId, post)` for visibility checks — decoupled from better-auth (auth proves who you are, `canView` proves what you can see).
-  **Alternative:** JWT bearer for WS — viable but better-auth default is cookie session; staying cookie-aligned avoids dual auth modes.
+  **Alternative:** JWT bearer for WS — viable but better-auth default is cookie session; staying cookie-aligned avoids dual auth modes. Custom middleware that re-implements session logic was rejected — better-auth handles it.
 
 ### 5. Visibility Enforcement: DB + Service Guard
 

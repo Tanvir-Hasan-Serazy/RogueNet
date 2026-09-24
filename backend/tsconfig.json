@@ -57,7 +57,7 @@
     "src/**/*",
     "ws-server/**/*",
     "workers/**/*",
-    "src/prisma/**/*",
+    "src/core/db/prisma/**/*",
     "tests/**/*",
     "/src/index.ts",
     "prisma.config.ts"

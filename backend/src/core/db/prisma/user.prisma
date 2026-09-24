@@ -1,0 +1,17 @@
+model User {
+  id                  String    @id
+  name                String
+  firstName           String
+  lastName            String
+  email               String    @unique
+  emailVerified       Boolean
+  username            String?   @unique
+  dob                 String?
+  createdAt           DateTime
+  updatedAt           DateTime
+  image               String?
+  cloudinarySecureUrl String?
+  sessions            Session[]
+  accounts            Account[]
+  profile             Profile?
+}

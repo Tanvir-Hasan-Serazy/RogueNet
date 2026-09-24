@@ -6,7 +6,7 @@ Greenfield social network (roguenet) for learning — no existing codebase. The 
 
 New platform with phased delivery. No breaking changes (greenfield).
 
-- **Auth (better-auth):** Email/password + email verification, cookie-based session management, Google and GitHub OAuth, protected routes via Better Auth session APIs, and a user table owned by the Prisma adapter. Username/profile extension on top of Better Auth's `user` model.
+- **Auth (better-auth):** Email/password + email verification, cookie-based session management, Google and GitHub OAuth, and a user table owned by the Prisma adapter. All route protection delegates to better-auth via `auth.api.getSession` (no custom auth/middleware — thin wrapper only). Username/profile extension on top of Better Auth's `user` model.
 - **Phase 0 — Identity:** Profiles (display name, bio, avatar) linked to better-auth user, follow/unfollow with follower graph
 - **Phase 1 — Content:** Posts with three visibility levels (public / followers-only / private), media uploads via Cloudinary (image + video, signed direct upload), flat-threaded replies (single parent level + optional reply_to_user hint), simple reposts (hide everywhere if original deleted or becomes private/restricted)
 - **Phase 2 — Engagement:** Upvote/downvote (downvote demotes in feed ranking, not deletion), bookmarks, vote state per user
@@ -38,6 +38,6 @@ Cross-cutting: soft deletes for posts, visibility enforcement on every read path
 ## Impact
 
 - **Code:** Express API with Better Auth's Node handler, Next.js frontend, WebSocket/presence service, worker for notification batching, Postgres schema managed by Prisma 7, Redis for presence/pub-sub, and Cloudinary.
-- **APIs:** Better Auth handles `/api/auth/*` through the Express adapter; the app adds REST/WS for all social capabilities plus `POST /api/media/sign` for Cloudinary. WebSocket auth uses the Better Auth session cookie.
+- **APIs:** Better Auth handles `/api/auth/*` through the Express adapter and is the sole authority for session validation (`auth.api.getSession`); the app adds REST/WS for all social capabilities plus `POST /api/media/sign` for Cloudinary. WebSocket auth also delegates to Better Auth session cookie. No custom auth middleware.
 - **Dependencies:** `better-auth`, `@prisma/client` 7, `@prisma/adapter-pg`, Postgres, Redis, Cloudinary, WebSocket library (Socket.io/ws + Redis adapter), and a queue/worker (BullMQ/pg-boss) for batching.
 - **Systems:** better-auth session table/adapter migration is source of truth for identity; all other tables FK to `user.id`; horizontal WS scaling requires Redis adapter; visibility checks must use `session.user.id` from better-auth on every read path.

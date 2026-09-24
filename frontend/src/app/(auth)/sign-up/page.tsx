@@ -50,6 +50,8 @@ const SignUpPage = () => {
   } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
+      firstName: "",
+      lastName: "",
       username: "",
       email: "",
       password: "",
@@ -61,9 +63,12 @@ const SignUpPage = () => {
   const onSubmit = async (data: SignUpFormValues) => {
     try {
       await signUp({
+        firstName: data.firstName,
+        lastName: data.lastName,
         username: data.username,
         email: data.email,
         password: data.password,
+        confirmPassword: data.confirmPassword,
         dob: data.dob,
       });
       toast.add({
@@ -149,6 +154,64 @@ const SignUpPage = () => {
             className="space-y-5"
           >
             <FieldGroup className="gap-5">
+              {/* First name */}
+              <Field data-invalid={!!errors.firstName}>
+                <FieldLabel
+                  htmlFor="firstName"
+                  className="text-sm font-medium leading-none"
+                >
+                  First name
+                </FieldLabel>
+                <Input
+                  id="firstName"
+                  type="text"
+                  autoComplete="given-name"
+                  placeholder="First name"
+                  aria-invalid={!!errors.firstName}
+                  aria-describedby={
+                    errors.firstName ? "firstName-error" : undefined
+                  }
+                  className="h-10 rounded-md border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 md:text-sm"
+                  {...register("firstName")}
+                />
+                {errors.firstName && (
+                  <FieldError
+                    id="firstName-error"
+                    errors={[{ message: errors.firstName.message }]}
+                    className="text-sm font-medium"
+                  />
+                )}
+              </Field>
+
+              {/* Last name */}
+              <Field data-invalid={!!errors.lastName}>
+                <FieldLabel
+                  htmlFor="lastName"
+                  className="text-sm font-medium leading-none"
+                >
+                  Last name
+                </FieldLabel>
+                <Input
+                  id="lastName"
+                  type="text"
+                  autoComplete="family-name"
+                  placeholder="Last name"
+                  aria-invalid={!!errors.lastName}
+                  aria-describedby={
+                    errors.lastName ? "lastName-error" : undefined
+                  }
+                  className="h-10 rounded-md border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 md:text-sm"
+                  {...register("lastName")}
+                />
+                {errors.lastName && (
+                  <FieldError
+                    id="lastName-error"
+                    errors={[{ message: errors.lastName.message }]}
+                    className="text-sm font-medium"
+                  />
+                )}
+              </Field>
+
               {/* Username */}
               <Field data-invalid={!!errors.username}>
                 <FieldLabel

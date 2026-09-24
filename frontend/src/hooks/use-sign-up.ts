@@ -3,10 +3,12 @@ import { useMutation } from "@tanstack/react-query";
 import { authClient } from "@/lib/auth-client";
 
 type SignUpPayload = {
+  firstName: string;
+  lastName: string;
   username: string;
   email: string;
   password: string;
-  confirmPassword?: string;
+  confirmPassword: string;
   dob: string;
 };
 
@@ -21,11 +23,14 @@ export const useSignup = () =>
       const { data, error } = await authClient.signUp.email({
         email: payload.email,
         password: payload.password,
-        name: payload.username,
+        name: `${payload.firstName} ${payload.lastName}`,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
         username: payload.username,
         dob: payload.dob,
+        confirmPassword: payload.confirmPassword,
       } as Parameters<typeof authClient.signUp.email>[0] &
-        Pick<SignUpPayload, "username" | "dob">);
+        Pick<SignUpPayload, "username" | "dob" | "confirmPassword">);
       if (error) {
         throw new Error(error.message || "Registration failed");
       }

@@ -4,13 +4,22 @@
 - [x] 1.2 Install and configure Better Auth with the Prisma adapter, Express Node handler at `/api/auth/*`, cookie sessions, and Google/GitHub environment configuration
 - [ ] 1.3 Apply the Prisma migration for `user/session/account/verification` and the optional `username`/`dob` user fields; the remote database migration is still pending
 - [x] 1.4 Configure the frontend `authClient` for email sign-in/sign-up and Google/GitHub sign-in
-- [ ] 1.5 Add session queries and protected-route helpers using `auth.api.getSession`; verify 401 without a cookie and 200 with a valid session
+- [x] 1.5 Verify better-auth session integration on app routes (thin `auth.api.getSession` delegation — no custom auth middleware; better-auth is the sole authority) — verify 401 without cookie and 200 with valid session via better-auth
 
 ## 2. Identity — Profile & Social Graph
 
-- [ ] 2.1 Implement profile extension CRUD atop better-auth user (username unique with `@@unique`, displayName, bio, avatarUrl) with validation, and verify duplicate username returns 409 and unauthenticated edit returns 401
-- [ ] 2.2 Implement follow/unfollow with `follows` table FK to `user.id`, self-follow rejection, idempotent follow, follower/following counts, and verify follow increments counts and unfollow decrements via API tests using better-auth sessions for both users
-- [ ] 2.3 Implement follower/following list endpoints with pagination and viewer follow-state (derived from `session.user.id`), and verify paginated response includes `viewer_follows` flag and unauthenticated viewer gets public counts only
+- [ ] 2.1 Add profile fields and unique username constraint to the Prisma schema
+- [ ] 2.2 Apply and verify the profile database migration
+- [ ] 2.3 Implement profile validation and profile read endpoint
+- [ ] 2.4 Implement profile update endpoint with authentication
+- [ ] 2.5 Add profile tests for validation, duplicate username, and unauthenticated edits
+- [ ] 2.6 Add the follows table and Prisma relations
+- [ ] 2.7 Implement follow endpoint with self-follow rejection and idempotency
+- [ ] 2.8 Implement unfollow endpoint and follower/following counts
+- [ ] 2.9 Add follow/unfollow API tests using better-auth sessions
+- [ ] 2.10 Implement paginated follower and following list endpoints
+- [ ] 2.11 Add viewer follow-state and anonymous-user behavior
+- [ ] 2.12 Add pagination and viewer-state integration tests
 
 ## 3. Content — Posts, Media, Replies, Voting, Bookmarks
 

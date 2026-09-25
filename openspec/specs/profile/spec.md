@@ -25,11 +25,22 @@ The system SHALL allow any viewer (authenticated via better-auth or anonymous) t
 
 #### Scenario: View existing profile
 - **WHEN** a viewer requests a profile for an existing username
-- **THEN** the system returns display name, bio, avatar URL, follower/following counts, and join date without exposing email or private fields
+- **THEN** the system returns display name (alias of username per product decision), bio, avatar URL, follower/following counts, and join date without exposing email or private fields
 
 #### Scenario: View non-existent profile
 - **WHEN** a viewer requests a profile for a username that does not exist
 - **THEN** the system returns a not-found error
+
+### Requirement: Owner-conditional private fields (single conditional endpoint)
+The system SHALL use a single conditional endpoint `GET /api/profiles/:username` with optional `better-auth` session (`viewerId?: string | null` via `auth.api.getSession` + `fromNodeHeaders`). The system SHALL return private fields (`email`, `dob`, `emailVerified`) and `isOwner:true` only when `viewerId === user.id`; otherwise it SHALL return only public fields with `isOwner:false`.
+
+#### Scenario: Owner views own profile
+- **WHEN** an authenticated viewer whose `session.user.id` equals the profile `user.id` requests `GET /api/profiles/:username`
+- **THEN** the system returns public fields plus `email`, `dob`, `emailVerified`, and `isOwner:true`
+
+#### Scenario: Stranger or anonymous views profile
+- **WHEN** an anonymous viewer or an authenticated viewer with `viewerId !== user.id` requests `GET /api/profiles/:username`
+- **THEN** the system returns only public fields with `isOwner:false` and MUST NOT expose `email`, `dob`, or other private fields
 
 ### Requirement: Avatar handling via Cloudinary URL
 The system SHALL store avatar as a Cloudinary secure URL and SHALL validate URL format on save.

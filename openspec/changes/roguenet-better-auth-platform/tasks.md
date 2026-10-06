@@ -11,7 +11,7 @@
 - [ ] 2.1 Add profile fields and unique username constraint to the Prisma schema
 - [ ] 2.2 Apply and verify the profile database migration
 - [x] 2.3 Implement profile validation and profile read endpoint
-- [ ] 2.4 Implement profile update endpoint with authentication
+- [x] 2.4 Implement profile update endpoint with authentication
 - [ ] 2.5 Add profile tests for validation, duplicate username, and unauthenticated edits
 - [ ] 2.6 Add the follows table and Prisma relations
 - [ ] 2.7 Implement follow endpoint with self-follow rejection and idempotency

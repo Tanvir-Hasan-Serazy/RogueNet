@@ -14,4 +14,8 @@ model User {
   sessions            Session[]
   accounts            Account[]
   profile             Profile?
+
+  // Social Graph relations
+  followers Follow[] @relation("UserFollowers")
+  follows   Follow[] @relation("UserFollowing")
 }

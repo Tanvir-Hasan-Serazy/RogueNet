@@ -28,13 +28,13 @@ import {
   ConflictError,
   ForbiddenError,
   getProfileByUsername,
-  NotFoundError,
   updateProfileByUsername,
 } from "../features/profile/profile.service";
 import {
   updateProfileBodySchema,
   usernameParamSchema,
 } from "../features/profile/profile.schema";
+import { NotFoundError } from "@/core/errors/not-found-error";
 
 const findUnique = vi.mocked(db.user.findUnique);
 const userUpdate = vi.mocked(db.user.update);

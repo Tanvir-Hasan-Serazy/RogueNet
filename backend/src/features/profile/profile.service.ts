@@ -1,18 +1,9 @@
+import { NotFoundError } from "@/core/errors/not-found-error";
 import { db } from "../../core/db/client";
 import {
   uploadAvatarBuffer,
   type AvatarFile,
 } from "../../core/media/avatarUpload";
-
-export class NotFoundError extends Error {
-  status = 404;
-  constructor(m: string) {
-    super(m);
-  }
-}
-
-// Back-compat alias (existing controller imports the old name).
-export { NotFoundError as notFoundError };
 
 export class ForbiddenError extends Error {
   status = 403;

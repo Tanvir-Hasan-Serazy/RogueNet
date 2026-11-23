@@ -1,17 +1,14 @@
 import type { Request, Response, NextFunction } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../../core/auth/auth";
-import {
-  usernameParamSchema,
-  updateProfileBodySchema,
-} from "./profile.schema";
+import { usernameParamSchema, updateProfileBodySchema } from "./profile.schema";
 import {
   getProfileByUsername,
   updateProfileByUsername,
-  NotFoundError,
   ForbiddenError,
   ConflictError,
 } from "./profile.service";
+import { NotFoundError } from "@/core/errors/not-found-error";
 
 export const getProfileByUsernameHandler = async (
   req: Request,

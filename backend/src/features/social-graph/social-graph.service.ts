@@ -1,12 +1,6 @@
 import { db } from "../../core/db/client";
-import { notFoundError } from "../profile/profile.service";
-
-export class BadRequestError extends Error {
-  status = 400;
-  constructor(m: string) {
-    super(m);
-  }
-}
+import { BadRequestError } from "@/core/errors/bad-request-error";
+import { NotFoundError } from "@/core/errors/not-found-error";
 
 export type FollowResult = {
   followerId: string;
@@ -14,54 +8,50 @@ export type FollowResult = {
   alreadyFollowing: boolean;
 };
 
-/* Follow a user by their username.
- * Ensures self-follow is rejected and the operation is idempotent.
- */
-
-export const follower = async (
+export async function followUser(
   followerId: string,
   targetUsername: string,
-): Promise<FollowResult> => {
-  const targetUser = await db.user.findUnique({
+): Promise<FollowResult> {
+  const target = await db.user.findUnique({
     where: { username: targetUsername },
-    select: { id: true, username: true },
+    select: { id: true },
   });
 
-  if (!targetUser) {
-    throw new notFoundError(` User @${targetUsername} not found`);
+  if (!target) {
+    throw new NotFoundError(`User @${targetUsername} not found`);
   }
 
-  if (followerId === targetUser.id) {
-    throw new BadRequestError("You cannot follow yourself");
+  if (target.id === followerId) {
+    throw new BadRequestError(`You cannot follow yourself`);
   }
 
-  const existingFollow = await db.follow.findUnique({
-    where: {
-      followerId_followingId: {
-        followerId,
-        followingId: targetUser.id,
-      },
-    },
-  });
+  try {
+    await db.follow.create({
+      data: { followerId: followerId, followingId: target.id },
+    });
 
-  if (existingFollow) {
     return {
-      followerId,
-      followingId: targetUser.id,
-      alreadyFollowing: true,
+      followerId: followerId,
+      followingId: target.id,
+      alreadyFollowing: false,
     };
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return {
+        followerId: followerId,
+        followingId: target.id,
+        alreadyFollowing: true,
+      };
+    }
+    throw error;
   }
+}
 
-  const follow = await db.follow.create({
-    data: {
-      followerId,
-      followingId: targetUser.id,
-    },
-  });
-
-  return {
-    followerId: follow.followerId,
-    followingId: follow.followingId,
-    alreadyFollowing: false,
-  };
-};
+function isUniqueViolation(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}

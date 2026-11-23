@@ -1,7 +1,7 @@
 # Voting Specification
 
 ## Purpose
-Implements upvote and downvote per better-auth user per post with persisted vote state and a demotion-based ranking signal for the feed.
+Implements upvote and downvote per better-auth user per post with persisted vote state and a downvote-demotion signal consumed by the home-feed EdgeRank score.
 
 ## Requirements
 
@@ -28,12 +28,12 @@ The system SHALL allow an authenticated user (via better-auth session) to cast e
 - **WHEN** a request without a valid better-auth session attempts to vote
 - **THEN** the system returns 401
 
-### Requirement: Downvote demotes in feed ranking
-The system SHALL use downvotes to demote posts in feed ordering (lower rank), not to delete or hide them from all users.
+### Requirement: Vote signals feed EdgeRank ordering
+The system SHALL feed vote state into home-feed EdgeRank ordering. Downvotes MUST reduce a post's EdgeRank score, while upvotes MAY contribute to the viewer-author affinity or post quality signal. Votes SHALL NOT delete or globally hide a post.
 
 #### Scenario: Downvoted post ranks lower
-- **WHEN** two posts have equal age and one has more downvotes
-- **THEN** the feed SHALL order the more downvoted post lower when sorted by ranking
+- **WHEN** two posts have equal affinity, edge weight, and age but one has more downvotes
+- **THEN** the more-downvoted post SHALL receive the lower EdgeRank and appear later in the feed
 
 #### Scenario: Downvote does not hide from author
 - **WHEN** a post receives downvotes

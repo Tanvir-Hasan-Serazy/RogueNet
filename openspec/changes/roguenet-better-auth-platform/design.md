@@ -9,14 +9,14 @@ Greenfield social platform (roguenet) with no existing code. See proposal.md Why
 - Integrate better-auth as the sole auth source of truth with Prisma or Drizzle adapter, cookie-based sessions, email/password + verification, and optional OAuth, reused for both HTTP and WebSocket auth.
 - Deliver phased social product (identity -> content -> engagement -> distribution -> real-time) without schema-breaking migrations, with better-auth user as FK root for all social tables.
 - Data model that supports visibility (public/followers_only/private) and soft-delete inheritance for reposts on day one.
-- Hybrid fan-out (push to presence-tracked active users, pull for offline) and correct pagination (cursor for feed, offset for search).
+- Hybrid fan-out (push to presence-tracked active users, pull for offline), viewer-specific EdgeRank feed ordering (affinity × edge weight × time decay), and correct pagination (opaque ranked cursor for feed, offset for search).
 - Search via Postgres FTS initially, pluggable to Typesense/Meilisearch later.
 - Single multiplexed authenticated WebSocket tied to better-auth session for presence, messaging, typing, live comments/notifications.
 
 **Non-Goals:**
 
 - Custom auth, manual password hashing, or parallel session tables outside better-auth.
-- Recommendation ML / algorithmic For You feed beyond simple downvote demotion + recency.
+- Learned recommendation ML / a separate algorithmic "For You" feed beyond the deterministic EdgeRank model (affinity × edge weight × time decay, with downvote demotion).
 - E2E encryption for messaging.
 - Video transcoding beyond Cloudinary.
 - Multi-region / edge replication, native mobile push (FCM/APNs).
@@ -82,15 +82,26 @@ All app tables FK to `user.id` from better-auth. Username uniqueness enforced vi
 **Chosen:** Presence `SET presence:{userId} 1 EX 300` on WS connect + 30s heartbeat. On post create: fetch follower IDs, intersect with online set (Redis), push `new_post` via WS to online followers; offline served via pull `WHERE authorId IN (following+self) AND canView` on next feed request. Demonstrates both paths.
 **Alternative:** Pure push (timeline tables) — storage heavy; pure pull — never teaches push.
 
-### 7. Pagination: Cursor for Feed, Offset for Search
+### 7. Pagination: Opaque Ranked Cursor for Feed, Offset for Search
 
-**Chosen:** Feed `WHERE id < :cursor ORDER BY id DESC LIMIT 20` (or `(createdAt,id)` composite). Search `LIMIT 20 OFFSET :page*20` with max page cap 100. Directly teaches offset drift (demo bug with two browsers, then fix).
-**Alternative:** All offset — duplicates/skips on live feed; all cursor — no page jumps for search.
+**Chosen:** Feed pagination uses an opaque cursor over the ranked position `(score DESC, id DESC)`. The cursor encodes the last returned score, post id, and a ranking snapshot token; the next page is `score < :cursorScore OR (score = :cursorScore AND id < :cursorId)` evaluated against that snapshot. Ranking snapshots (for example a short-lived Redis-ordered candidate list keyed by viewer and snapshot id, 5-minute TTL) keep page 1 and page 2 consistent when posts are inserted or engagement changes mid-scroll. Search keeps `LIMIT 20 OFFSET :page*20` with a max page cap of 100. Directly teaches offset drift (demo bug with two browsers, then fix) for search while the feed stays stable.
+**Alternative:** Offset on the feed — duplicates/skips under inserts; id-only cursor — incompatible with ranked ordering; recomputing scores on every page — old posts can reappear or disappear at page boundaries.
 
-### 8. Ranking: Downvote Demotion
+### 8. Ranking: Viewer-Specific EdgeRank
 
-**Chosen:** `score = (up - down) - hours_since*0.5` with `effectiveScore = score - down*1.5` penalty, ordered in feed. Precompute `hotScore` column updated on vote or async job for MVP.
-**Alternative:** Wilson/Reddit hot — deferred iteration.
+**Chosen:** Rank the home feed with EdgeRank:
+
+```
+EdgeRank(viewer, post) = affinity(viewer, author) × edgeWeight(post) × timeDecay(post.createdAt) × quality(post, viewer)
+```
+
+- `affinity` in `[0.1, 1.0]`: self = 1.0, mutual follow = 1.0, viewer follows author = 0.85, author follows viewer = 0.6, no edge = 0.3, plus a capped bonus from recent interactions (votes, replies, reposts, bookmarks).
+- `edgeWeight`: original post = 1.0, repost = 0.8, reply = 0.6; a richer edge such as one with media may add a small boost (e.g. +0.1).
+- `timeDecay`: `0.5 ^ (ageHours / halfLifeHours)` with a configurable half-life, default 12 hours.
+- `quality`: downvotes apply a demotion multiplier (e.g. `max(0.1, 1 - 0.5 × downRatio)`); upvotes may contribute to affinity or quality. Downvotes demote, never hide.
+
+Weights and the half-life live in config so they can be tuned without code changes. Scoring is computed per request over the candidate set (followed authors + self) and cached as an ordered snapshot for cursor pagination; a materialized ranking-score column is deferred until the simple path is measured.
+**Alternative:** Plain reverse-chronological — simple but ignores the social graph; Reddit/Wilson hot — still useful for a future "Top" tab, but not the default relationship-aware feed; pure downvote demotion + recency — the previous plan, replaced because it does not use the follow graph or edge type.
 
 ### 9. Search: Postgres FTS First, Pluggable
 
@@ -120,7 +131,9 @@ All app tables FK to `user.id` from better-auth. Username uniqueness enforced vi
 - [Presence TTL drift] Disconnect without close shows online up to 5 min -> Mitigation: short TTL 60-120s + heartbeat, show lastSeen fallback.
 - [Fan-out thundering herd] 50k followers intersect + push -> Mitigation: push via queue in batches, cap MVP to small follower counts, document limit.
 - [Visibility leakage via repost/search] -> Mitigation: central `canView`, integration tests assert non-follower cannot fetch via any path, including via repost ID.
-- [Cursor pagination with ranking] Ordering by hotScore breaks id cursor -> Mitigation: MVP chronological `id DESC` with demotion filter; separate "Top" tab with `(hotScore,id)` cursor.
+- [Cursor pagination with ranking] Ranked ordering breaks an id-only cursor -> Mitigation: opaque `(score, id)` cursor bound to a short-lived ranking snapshot so inserts/engagement changes do not duplicate or skip rows; refresh starts a new snapshot.
+- [Affinity changes mid-scroll] Follow/unfollow or interaction bonuses may reorder posts between pages -> Mitigation: freeze affinity and decay inputs inside the pagination snapshot; recompute only on a fresh feed load.
+- [EdgeRank weight tuning] Hand-tuned affinity/weight constants can produce stale or repetitive feeds -> Mitigation: keep weights in config, start with a 12-hour half-life and follow-graph affinity, log score components, and tune from observed ranking quality before adding learned signals.
 - [Offset deep pages slow] -> Mitigation: max page 100 cap, document cursor alternative.
 - [Cloudinary quota] Unbounded uploads -> Mitigation: signed URL expiry, per-user rate limit, max size/mime validation, protected by better-auth session.
 - [WS horizontal scale] User A on server 1, user B on server 2 cannot receive event -> Mitigation: Redis pub/sub adapter (Socket.io Redis adapter or custom), demo with 2 instances after single-instance works.
@@ -132,7 +145,7 @@ Greenfield — no migration. Deploy order:
 
 1. Configure the Express Better Auth Node handler, Prisma 7 adapter, Next.js client, and environment variables; run `prisma generate` and `prisma migrate`, then verify sign-up/sign-in/session and a protected route -> deploy.
 2. Add profile/social-graph/posts/replies/voting/bookmarks (HTTP only, `canView` guard using `session.user.id`) -> deploy, verify visibility.
-3. Add Cloudinary signed uploads (protected by better-auth session), FTS search, feed cursor/offset, notification batching worker -> deploy, verify pagination.
+3. Add Cloudinary signed uploads (protected by better-auth session), FTS search, EdgeRank feed with ranked cursor/snapshot pagination, notification batching worker -> deploy, verify ranking and pagination.
 4. Add WS server + presence + live notifications/typing/comments (WS auth via better-auth session) -> single instance -> deploy.
 5. Add messaging (1:1 then groups) + read receipts -> deploy, test offline delivery.
 6. Scale: second WS instance + Redis adapter, queue fan-out.
@@ -144,4 +157,4 @@ Rollback: each phase behind feature flag/routes; DB columns nullable first; bett
 - OAuth providers: which to enable at MVP (email/password alone is sufficient; adding GitHub/Google later is non-breaking via better-auth config). Default to email/password + verification at MVP.
 - better-auth session strategy: cookie session (default) vs JWT — defer; default to cookie as better-auth's primary, more secure for Next.js.
 - Group admin permissions (who can add/remove, rename) — defer to messaging phase 2; MVP any member can add, creator is admin.
-- Hot score tuning and search relevance weights — defer until base chronological feed + FTS work.
+- EdgeRank affinity/weight/half-life tuning and the future "Top" tab weights — defer until the deterministic EdgeRank feed works end to end.

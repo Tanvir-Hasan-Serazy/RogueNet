@@ -1,2 +1,5 @@
 schema: spec-driven
 created: 2026-08-30
+# Specs were consolidated into openspec/specs/ (single source of truth).
+# This change has no delta specs of its own.
+skip_specs: true

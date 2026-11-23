@@ -13,7 +13,7 @@
 - [x] 2.3 Implement profile validation and profile read endpoint
 - [x] 2.4 Implement profile update endpoint with authentication
 - [x] 2.5 Add profile tests for validation, duplicate username, and unauthenticated edits
-- [ ] 2.6 Add the follows table and Prisma relations
+- [x] 2.6 Add the follows table and Prisma relations
 - [ ] 2.7 Implement follow endpoint with self-follow rejection and idempotency
 - [ ] 2.8 Implement unfollow endpoint and follower/following counts
 - [ ] 2.9 Add follow/unfollow API tests using better-auth sessions
@@ -28,13 +28,13 @@
 - [ ] 3.3 Implement simple reposts with inheritance (hide if `original.deletedAt` or original not visible to `session.user.id`), and verify repost hidden for all viewers after original soft-deleted via integration test
 - [ ] 3.4 Implement flat-threaded replies (`postId` parent + `replyToUserId` hint) with chronological listing, reply counts, and verify reply to a reply stores `parent_post_id` = root post
 - [ ] 3.5 Implement voting (PK user+post where user is `session.user.id`, value +-1, counts/score atomic) with viewer vote state in responses, and verify changing vote from +1 to -1 adjusts counts correctly and unauthenticated vote returns 401
-- [ ] 3.6 Implement downvote demotion ranking (`score - down*1.5 - age*0.5`) and verify more downvoted post ranks lower in authenticated feed response
+- [ ] 3.6 Implement the viewer-specific EdgeRank scoring service (`affinity × edgeWeight × timeDecay × quality`, config-driven weights, 12h default half-life, self/mutual/one-way/no-edge affinity, downvote demotion) and verify a stronger-affinity, fresher post outranks a weaker, older one and more downvotes lower the score without hiding the post
 - [ ] 3.7 Implement bookmarks (PK user+post) with visibility check and list ordered by bookmark time, and verify bookmarking a private post of non-followed user returns 404
 
 ## 4. Distribution — Feed, Search, Notifications
 
-- [ ] 4.1 Implement home feed pull path for authenticated viewer: `WHERE authorId IN (following+self) AND canView` with cursor pagination (`WHERE id < :cursor ORDER BY id DESC LIMIT 20`), and verify two browsers paginating with cursor see no duplicates after concurrent inserts and unauthenticated feed returns 401
-- [ ] 4.2 Enforce pagination policy (cursor for feed, offset for search) and verify feed rejects offset param and search accepts offset/page, with test demonstrating offset drift bug on live feed
+- [ ] 4.1 Implement home feed pull path for authenticated viewer: `WHERE authorId IN (following+self) AND canView`, score candidates with EdgeRank, order by `(score DESC, id DESC)`, and paginate with an opaque `(score, id, snapshot)` cursor bound to a ranking snapshot; verify two browsers paginating see no duplicates/skips after concurrent inserts or vote changes and unauthenticated feed returns 401
+- [ ] 4.2 Enforce pagination policy (opaque ranked cursor + ranking snapshot for feed, offset for search) and verify feed rejects offset param and search accepts offset/page, with test demonstrating offset drift bug on a live ranked feed
 - [ ] 4.3 Implement hybrid fan-out: presence service (`SET presence:{userId} EX 300` + heartbeat) tied to better-auth WS identity, on post create intersect followers with online set and emit via WS, offline via pull, and verify online follower receives `feed:new` within 2s and offline sees post on next pull
 - [ ] 4.4 Implement search with toggle `Posts | People` using Postgres `tsvector+GIN` for posts and `pg_trgm` for people, offset pagination, max page cap 100, and verify followers-only post not returned to non-follower in `posts` search
 - [ ] 4.5 Implement notifications base (event generation for follow/reply/repost/mention with better-auth user IDs) and batched aggregation for upvotes/follows (5-min window via BullMQ/pg-boss + Redis buffer), and verify 3 upvotes within window produce single aggregated notification with count 3
@@ -62,4 +62,4 @@
 - [ ] 7.1 Add integration tests for visibility matrix (public/followers_only/private x author/follower/stranger/anon x direct/feed/search/repost/reply) using better-auth sessions for each actor, and verify all disallowed combos return 404/omission
 - [ ] 7.2 Add rate limiting on Cloudinary sign and post/message create (protected by better-auth session), max file size/mime validation, and verify oversized upload rejected with 400
 - [ ] 7.3 Demonstrate WS horizontal scaling: run 2 server instances with Redis adapter, connect user A (session on instance 1) and user B (session on instance 2), and verify message/presence event crosses instances
-- [ ] 7.4 Seed script and manual QA for infinite scroll (cursor stability), batched notification flush (3 upvotes -> 1 notification), group typing with 3 authenticated users, and verify checklist passes in staging with better-auth sessions
+- [ ] 7.4 Seed script and manual QA for EdgeRank ordering (affinity/recency/downvote scenarios), infinite-scroll cursor/snapshot stability, batched notification flush (3 upvotes -> 1 notification), group typing with 3 authenticated users, and verify checklist passes in staging with better-auth sessions

@@ -9,8 +9,8 @@ New platform with phased delivery. No breaking changes (greenfield).
 - **Auth (better-auth):** Email/password + email verification, cookie-based session management, Google and GitHub OAuth, and a user table owned by the Prisma adapter. All route protection delegates to better-auth via `auth.api.getSession` (no custom auth/middleware — thin wrapper only). Username/profile extension on top of Better Auth's `user` model.
 - **Phase 0 — Identity:** Profiles (display name, bio, avatar) linked to better-auth user, follow/unfollow with follower graph
 - **Phase 1 — Content:** Posts with three visibility levels (public / followers-only / private), media uploads via Cloudinary (image + video, signed direct upload), flat-threaded replies (single parent level + optional reply_to_user hint), simple reposts (hide everywhere if original deleted or becomes private/restricted)
-- **Phase 2 — Engagement:** Upvote/downvote (downvote demotes in feed ranking, not deletion), bookmarks, vote state per user
-- **Phase 3 — Distribution:** Home feed with infinite scroll (hybrid fan-out: push to presence-tracked active users via WebSocket, pull on read for offline), cursor pagination for feed + offset pagination for search page jumps, search with toggle `Posts | People` (Postgres FTS), batched notifications for upvotes/follows (5-min aggregation window)
+- **Phase 2 — Engagement:** Upvote/downvote contributes to EdgeRank (downvotes demote, not delete), bookmarks, vote state per user
+- **Phase 3 — Distribution:** Home feed with infinite scroll ordered by viewer-specific EdgeRank (affinity × edge weight × time decay, with downvote demotion) and hybrid fan-out (push to presence-tracked active users via WebSocket, pull on read for offline), opaque ranked cursor pagination for feed + offset pagination for search page jumps, search with toggle `Posts | People` (Postgres FTS), batched notifications for upvotes/follows (5-min aggregation window)
 - **Phase 4 — Real-time:** Real-time messaging 1:1 and group conversations (text + image, Messenger-style), live notifications, online presence, typing indicators, real-time comments — all multiplexed over authenticated WebSocket tied to better-auth session
 
 Cross-cutting: soft deletes for posts, visibility enforcement on every read path (feed, search, reposts, replies), unread counts, signed Cloudinary uploads.
@@ -24,8 +24,8 @@ Cross-cutting: soft deletes for posts, visibility enforcement on every read path
 - `social-graph`: Follow/unfollow, follower/following lists and counts, follow-state checks for visibility
 - `posts`: Post creation with visibility, Cloudinary media attachments, simple reposts with visibility/deletion inheritance, bookmarks
 - `replies`: Flat-threaded replies to posts
-- `voting`: Upvote/downvote per user per post, vote state persistence, downvote-driven demotion in ranking
-- `feed`: Home/timeline feed, infinite scroll, hybrid fan-out (push to active, pull for offline), cursor pagination for feed
+- `voting`: Upvote/downvote per user per post, vote state persistence, downvote-demotion signal consumed by feed EdgeRank
+- `feed`: Home/timeline feed, infinite scroll, viewer-specific EdgeRank ordering (affinity × edge weight × time decay), hybrid fan-out (push to active, pull for offline), opaque ranked cursor pagination for feed
 - `search`: Search with mode toggle (Posts vs People), full-text indexing, offset pagination for search
 - `notifications`: Notification generation, batching/aggregation for upvotes and follows, live push via WebSocket, unread counts
 - `messaging`: Conversations (1:1 and groups), participants/roles, text + image messages, history, read receipts

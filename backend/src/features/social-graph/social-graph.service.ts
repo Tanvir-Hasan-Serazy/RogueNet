@@ -8,10 +8,33 @@ export type FollowResult = {
   alreadyFollowing: boolean;
 };
 
-export async function followUser(
+export type UnfollowResult = {
+  followerId: string;
+  followingId: string;
+};
+
+function isUniqueViolation(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
+
+function isRecordNotFound(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2025"
+  );
+}
+
+export const followUser = async (
   followerId: string,
   targetUsername: string,
-): Promise<FollowResult> {
+): Promise<FollowResult> => {
   const target = await db.user.findUnique({
     where: { username: targetUsername },
     select: { id: true },
@@ -45,13 +68,45 @@ export async function followUser(
     }
     throw error;
   }
-}
+};
 
-function isUniqueViolation(error: unknown): error is { code: string } {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "P2002"
-  );
-}
+export const unfollowUser = async (
+  followerId: string,
+  targetUsername: string,
+): Promise<UnfollowResult> => {
+  const target = await db.user.findUnique({
+    where: { username: targetUsername },
+    select: { id: true },
+  });
+
+  if (!target) {
+    throw new NotFoundError(`User @${targetUsername} is not found`);
+  }
+
+  if (target.id === followerId) {
+    throw new BadRequestError(`You cannot unfollow yourself`);
+  }
+
+  try {
+    await db.follow.delete({
+      where: {
+        followerId_followingId: {
+          followerId: followerId,
+          followingId: target.id,
+        },
+      },
+    });
+
+    return {
+      followerId: followerId,
+      followingId: target.id,
+    };
+  } catch (error) {
+    if (isRecordNotFound(error)) {
+      throw new NotFoundError(
+        `You are not following this user @${targetUsername}`,
+      );
+    }
+    throw error;
+  }
+};

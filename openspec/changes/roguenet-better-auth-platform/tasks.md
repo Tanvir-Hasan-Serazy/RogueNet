@@ -14,7 +14,7 @@
 - [x] 2.4 Implement profile update endpoint with authentication
 - [x] 2.5 Add profile tests for validation, duplicate username, and unauthenticated edits
 - [x] 2.6 Add the follows table and Prisma relations
-- [ ] 2.7 Implement follow endpoint with self-follow rejection and idempotency
+- [x] 2.7 Implement follow endpoint with self-follow rejection and idempotency
 - [ ] 2.8 Implement unfollow endpoint and follower/following counts
 - [ ] 2.9 Add follow/unfollow API tests using better-auth sessions
 - [ ] 2.10 Implement paginated follower and following list endpoints

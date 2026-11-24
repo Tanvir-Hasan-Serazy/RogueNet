@@ -71,7 +71,15 @@ export async function getProfileByUsername(
 ): Promise<PublicProfile | PrivateProfile> {
   const user = await db.user.findUnique({
     where: { username },
-    include: { profile: true },
+    include: {
+      profile: true,
+      _count: {
+        select: {
+          follows: true,
+          followers: true,
+        },
+      },
+    },
   });
 
   if (!user || !user.username) {
@@ -87,8 +95,8 @@ export async function getProfileByUsername(
     bio: user.profile?.bio ?? null,
     avatarUrl,
     createdAt: user.createdAt,
-    followerCount: 0,
-    followingCount: 0,
+    followerCount: user._count.followers,
+    followingCount: user._count.follows,
   };
 
   return isOwner

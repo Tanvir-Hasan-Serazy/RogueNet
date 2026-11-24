@@ -15,8 +15,8 @@
 - [x] 2.5 Add profile tests for validation, duplicate username, and unauthenticated edits
 - [x] 2.6 Add the follows table and Prisma relations
 - [x] 2.7 Implement follow endpoint with self-follow rejection and idempotency
-- [ ] 2.8 Implement unfollow endpoint and follower/following counts
-- [ ] 2.9 Add follow/unfollow API tests using better-auth sessions
+- [x] 2.8 Implement unfollow endpoint and follower/following counts
+- [x] 2.9 Add follow/unfollow API tests using better-auth sessions
 - [ ] 2.10 Implement paginated follower and following list endpoints
 - [ ] 2.11 Add viewer follow-state and anonymous-user behavior
 - [ ] 2.12 Add pagination and viewer-state integration tests

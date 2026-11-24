@@ -10,6 +10,10 @@ vi.mock("../core/db/client", () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    follow: {
+      create: vi.fn(),
+      delete: vi.fn(),
+    },
   },
 }));
 
@@ -35,15 +39,19 @@ import {
   usernameParamSchema,
 } from "../features/profile/profile.schema";
 import { NotFoundError } from "@/core/errors/not-found-error";
+import { registerSocialGraphRoutes } from "../features/social-graph/social-graph.route";
 
 const findUnique = vi.mocked(db.user.findUnique);
 const userUpdate = vi.mocked(db.user.update);
 const getSession = vi.mocked(auth.api.getSession);
+const followCreate = vi.mocked(db.follow.create);
+const followDelete = vi.mocked(db.follow.delete);
 
 function buildApp() {
   const app = express();
   app.use(express.json());
   registerProfileRoutes(app);
+  registerSocialGraphRoutes(app);
   // Convert unexpected errors to JSON so supertest gets a body instead of HTML.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
@@ -63,6 +71,7 @@ const baseUser = {
   cloudinarySecureUrl: null,
   createdAt: new Date("2024-01-01T00:00:00Z"),
   profile: null,
+  _count: { followers: 0, follows: 0 },
 };
 
 beforeEach(() => {
@@ -157,6 +166,18 @@ describe("2.5 duplicate username", () => {
 });
 
 describe("2.5 unauthenticated / forbidden edits", () => {
+  it("returns follower and following counts on a public profile", async () => {
+    findUnique.mockResolvedValue({
+      ...baseUser,
+      _count: { followers: 7, follows: 3 },
+    } as never);
+
+    await expect(getProfileByUsername("alice")).resolves.toMatchObject({
+      followerCount: 7,
+      followingCount: 3,
+    });
+  });
+
   it("PATCH without session returns 401 and never touches the DB", async () => {
     getSession.mockResolvedValue(null as never);
     const res = await request(buildApp())
@@ -196,5 +217,154 @@ describe("2.5 unauthenticated / forbidden edits", () => {
     expect(profile).toMatchObject({ username: "alice", isOwner: false });
     expect(profile).not.toHaveProperty("email");
     if (profile instanceof NotFoundError) throw profile;
+  });
+});
+
+
+describe("2.9 follow-unfollow api test", () => {
+  it("rejects follow requests without a session", async () => {
+    getSession.mockResolvedValue(null as never);
+
+    const res = await request(buildApp())
+      .post("/api/profiles/bob/follow");
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/unauthorized/i);
+    expect(findUnique).not.toHaveBeenCalled();
+    expect(followCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid usernames before following", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-alice" },
+      session: { id: "sess-1" },
+    } as never);
+
+    const res = await request(buildApp())
+      .post("/api/profiles/ab/follow");
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/invalid username/i);
+  });
+
+  it("creates a follow edge and returns 201", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-alice" },
+      session: { id: "sess-1" },
+    } as never);
+    findUnique.mockResolvedValue({ id: "user-bob" } as never);
+    followCreate.mockResolvedValue({} as never);
+
+    const res = await request(buildApp())
+      .post("/api/profiles/bob/follow");
+
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({
+      followerId: "user-alice",
+      followingId: "user-bob",
+      alreadyFollowing: false,
+    });
+    expect(followCreate).toHaveBeenCalledWith({
+      data: {
+        followerId: "user-alice",
+        followingId: "user-bob",
+      },
+    });
+  });
+
+  it("returns 200 when the follow edge already exists", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-alice" },
+      session: { id: "sess-1" },
+    } as never);
+    findUnique.mockResolvedValue({ id: "user-bob" } as never);
+    followCreate.mockRejectedValue({ code: "P2002" });
+
+    const res = await request(buildApp())
+      .post("/api/profiles/bob/follow");
+
+    expect(res.status).toBe(200);
+    expect(res.body.alreadyFollowing).toBe(true);
+  });
+
+  it("rejects a user following themselves", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-alice" },
+      session: { id: "sess-1" },
+    } as never);
+    findUnique.mockResolvedValue({ id: "user-alice" } as never);
+
+    const res = await request(buildApp())
+      .post("/api/profiles/alice/follow");
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/cannot follow yourself/i);
+    expect(followCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the target user does not exist", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-alice" },
+      session: { id: "sess-1" },
+    } as never);
+    findUnique.mockResolvedValue(null);
+
+    const res = await request(buildApp())
+      .post("/api/profiles/missing/follow");
+
+    expect(res.status).toBe(404);
+  });
+
+  it("removes a follow edge and returns 200", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-alice" },
+      session: { id: "sess-1" },
+    } as never);
+    findUnique.mockResolvedValue({ id: "user-bob" } as never);
+    followDelete.mockResolvedValue({} as never);
+
+    const res = await request(buildApp())
+      .delete("/api/profiles/bob/follow");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      followerId: "user-alice",
+      followingId: "user-bob",
+    });
+    expect(followDelete).toHaveBeenCalledWith({
+      where: {
+        followerId_followingId: {
+          followerId: "user-alice",
+          followingId: "user-bob",
+        },
+      },
+    });
+  });
+
+  it("rejects unfollow requests without a session", async () => {
+    getSession.mockResolvedValue(null as never);
+
+    const res = await request(buildApp())
+      .delete("/api/profiles/bob/follow");
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toMatch(/unauthorized/i);
+    expect(findUnique).not.toHaveBeenCalled();
+    expect(followDelete).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when unfollowing a user that is not followed", async () => {
+    getSession.mockResolvedValue({
+      user: { id: "user-alice" },
+      session: { id: "sess-1" },
+    } as never);
+    findUnique.mockResolvedValue({ id: "user-bob" } as never);
+    followDelete.mockRejectedValue({ code: "P2025" });
+
+    const res = await request(buildApp())
+      .delete("/api/profiles/bob/follow");
+
+    expect(res.status).toBe(404);
+    expect(res.body.message).toMatch(/not following/i);
   });
 });
